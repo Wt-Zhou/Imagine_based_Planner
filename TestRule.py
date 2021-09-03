@@ -26,10 +26,10 @@ from collections import deque
 from gym import core, error, spaces, utils
 from gym.utils import seeding
 from TestScenario import CarEnv_03_Cut_In
-from Agent.JunctionTrajectoryPlanner import JunctionTrajectoryPlanner
-from Agent.controller import Controller
-from Agent.dynamic_map import DynamicMap
-from Agent.CP import CP, Imagine_Model
+from Agent.zzz.JunctionTrajectoryPlanner import JunctionTrajectoryPlanner
+from Agent.zzz.controller import Controller
+from Agent.zzz.dynamic_map import DynamicMap
+from Agent.zzz.CP import CP, Imagine_Model
 EPISODES=2642
 
 if __name__ == '__main__':

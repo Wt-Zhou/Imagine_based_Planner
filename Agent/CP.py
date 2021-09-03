@@ -32,11 +32,11 @@ from baselines.common.misc_util import (
 from baselines.common.schedules import LinearSchedule, PiecewiseSchedule
 from baselines.common.atari_wrappers_deprecated import wrap_dqn
 from Agent.model import dqn_model, bootstrap_model
-from Agent.JunctionTrajectoryPlanner import JunctionTrajectoryPlanner
-from Agent.controller import Controller
-from Agent.dynamic_map import DynamicMap
-from Agent.actions import LaneAction
-from Agent.World_model.world_model import World_Model
+from Agent.zzz.JunctionTrajectoryPlanner import JunctionTrajectoryPlanner
+from Agent.zzz.controller import Controller
+from Agent.zzz.dynamic_map import DynamicMap
+from Agent.zzz.actions import LaneAction
+from Agent.world_model.world_model import World_Model
 
 class CP(object):
 
@@ -364,8 +364,7 @@ class CP(object):
                 # Save the model and training state.
                 if num_iters >= 0 and num_iters % args.save_freq == 0:
                     save_model = True
-
-    
+   
     def learn_dqn(self, total_timesteps, env, load_model_step):      
         # Init DRL
         args = self.parse_args()
@@ -485,7 +484,6 @@ class CP(object):
                         'num_iters': num_iters,
                     })
                 num_iters += 1
-
 
     def record_test_data(self, model_step, model_reward, env):
         with open("Test_data.txt", 'a') as fw:
@@ -607,7 +605,7 @@ class CP(object):
 
 
 
-class Imagine_Model:
+class Log_Replay_Imagine_Model:
 
     def __init__(self, corner_buffer):
         
@@ -660,7 +658,6 @@ class Imagine_Model:
             print("[World_Model] : Load learned model successful, step=",load_step)
         except:
             pass
-
 
     def parse_args(self):
         parser = argparse.ArgumentParser()

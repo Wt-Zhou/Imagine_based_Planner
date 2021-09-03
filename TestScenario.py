@@ -27,8 +27,8 @@ from gym.utils import seeding
 from agents.navigation.global_route_planner import GlobalRoutePlanner
 from agents.navigation.global_route_planner_dao import GlobalRoutePlannerDAO
 
-from Agent.dynamic_map import Lanepoint, Lane, Vehicle
-from Agent.tools import *
+from Agent.zzz.dynamic_map import Lanepoint, Lane, Vehicle
+from Agent.zzz.tools import *
 
 MAP_NAME = 'Town03'
 OBSTACLES_CONSIDERED = 1 # For cut-in in Town03
