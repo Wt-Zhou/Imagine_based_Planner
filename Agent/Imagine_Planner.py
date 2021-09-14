@@ -78,7 +78,7 @@ class GMBRL(object):
         parser.add_argument("--save-dir", type=str, default="./logs", help="directory in which training state and model should be saved.")
         parser.add_argument("--save-azure-container", type=str, default=None,
                             help="It present data will saved/loaded from Azure. Should be in format ACCOUNT_NAME:ACCOUNT_KEY:CONTAINER")
-        parser.add_argument("--save-freq", type=int, default=500, help="save model once every time this many iterations are completed")
+        parser.add_argument("--save-freq", type=int, default=5000, help="save model once every time this many iterations are completed")
         boolean_flag(parser, "load-on-start", default=True, help="if true and model was previously saved then training will be resumed")
         return parser.parse_args()
 
@@ -404,6 +404,9 @@ class GMBRL(object):
             
             start_time, start_steps = None, None
             obs = env.reset()
+
+            episode_reward = 0
+
             while num_iters < total_timesteps:
                 obs = np.array(obs)
 
@@ -434,6 +437,8 @@ class GMBRL(object):
                     control_action =  self.controller.get_control(self.dynamic_map,  trajectory.trajectory, trajectory.desired_speed)
                     output_action = [control_action.acc, control_action.steering]
                     new_obs, rew, done, info = env.step(output_action)
+
+                    episode_reward += rew
                     if done:
                         break
                     self.dynamic_map.update_map_from_obs(new_obs, env)
@@ -443,10 +448,16 @@ class GMBRL(object):
                 obs = new_obs
 
                 if done:
-                    random_head = np.random.randint(args.bootstrapped_heads_num)
                     
                     self.trajectory_planner.clear_buff()
                     env.reset()
+                    fw = open("reward.txt", 'a')   
+                    # Write num
+
+                    fw.write(str(episode_reward)) 
+                    fw.write("\n")
+                    fw.close()        
+                    episode_reward = 0
 
                 if (num_iters > args.learning_starts and
                         num_iters % args.learning_freq == 0):

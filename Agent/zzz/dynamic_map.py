@@ -89,12 +89,12 @@ class DynamicMap():
         # self.ego_vehicle.yawdt = env.ego_vehicle.get_angular_velocity() 
         
         # Env information from obs
-        for i in range(int(len(obs)/4-1)):
+        for i in range(int(len(obs)/5-1)):
             vehicle = Vehicle()
-            vehicle.x = obs[0+4+4*i]
-            vehicle.y = obs[1+4+4*i]
-            vehicle.vx = obs[2+4+4*i]
-            vehicle.vy = obs[3+4+4*i]
+            vehicle.x = obs[0+5+5*i]
+            vehicle.y = obs[1+5+5*i]
+            vehicle.vx = obs[2+5+5*i]
+            vehicle.vy = obs[3+5+5*i]
             vehicle.lane_idx = 0
 
             vehicle.v = math.sqrt(vehicle.vx ** 2 + vehicle.vy ** 2)

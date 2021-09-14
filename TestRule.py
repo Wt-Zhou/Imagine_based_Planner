@@ -20,23 +20,26 @@ import math
 import random
 import cv2
 import gym
+import matplotlib.pyplot as plt
+
 
 from tqdm import tqdm
 from collections import deque
 from gym import core, error, spaces, utils
 from gym.utils import seeding
-from TestScenario import CarEnv_03_Cut_In
+from TestScenario import CarEnv_03_Cut_In,CarEnv_03_Cut_In_old
+from TestScenario_Town02 import CarEnv_02_Intersection_fixed
 from Agent.zzz.JunctionTrajectoryPlanner import JunctionTrajectoryPlanner
 from Agent.zzz.controller import Controller
 from Agent.zzz.dynamic_map import DynamicMap
-from Agent.zzz.CP import CP, Imagine_Model
+# from Agent.zzz.CP import CP, Imagine_Model
 EPISODES=2642
 
 if __name__ == '__main__':
 
     # Create environment
     
-    env = CarEnv_03_Cut_In()
+    env = CarEnv_03_Cut_In_old()
 
     # Create Agent
     trajectory_planner = JunctionTrajectoryPlanner()
@@ -46,6 +49,8 @@ if __name__ == '__main__':
 
     pass_time = 0
     task_time = 0
+    
+    fig, ax = plt.subplots()
 
     # Loop over episodes
     for episode in tqdm(range(1, EPISODES + 1), unit='episodes'):
@@ -60,17 +65,18 @@ if __name__ == '__main__':
 
         decision_count = 0
 
+
         # Loop over steps
         while True:
             obs = np.array(obs)
             dynamic_map.update_map_from_obs(obs, env)
             rule_trajectory, action = trajectory_planner.trajectory_update(dynamic_map)
 
-            action = np.array(1)
-            print("action",action)
+            # action = random.randint(0,6)
+            # print("action",action)
+            # rule_trajectory = trajectory_planner.trajectory_update_CP(action, rule_trajectory)
+            
             # Control
-            rule_trajectory = trajectory_planner.trajectory_update_CP(action, rule_trajectory)
-
             for i in range(5):
                 control_action =  controller.get_control(dynamic_map,  rule_trajectory.trajectory, rule_trajectory.desired_speed)
                 action = [control_action.acc, control_action.steering]
@@ -82,6 +88,22 @@ if __name__ == '__main__':
             obs = new_obs
             episode_reward += reward
 
+            # Draw Plot
+            ax.cla() 
+
+            angle = obs.tolist()[4]/math.pi*180
+            rect = plt.Rectangle((obs.tolist()[0],-obs.tolist()[1]),2.5,6,angle=-angle+90, facecolor="red")
+            ax.add_patch(rect)
+
+            angle2 = obs.tolist()[9]/math.pi*180 
+
+            # rect = plt.Rectangle((obs.tolist()[5],-obs.tolist()[6]),2,5,angle=obs.tolist()[9]/math.pi*180)
+            rect = plt.Rectangle((obs.tolist()[5],-obs.tolist()[6]),2.5,6,angle=-angle2+90)
+            ax.add_patch(rect)
+            # ax.axis([200, 315,-145,-30])# Town03 highway
+            ax.axis([-92,-13,-199,-137])# Town03 cut in
+            ax.legend()
+            plt.pause(0.001)
             
 
             if done:
