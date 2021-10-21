@@ -45,6 +45,7 @@
     "replay_buffer_capacity": 10000,
     "resource_files": null,
     "save_buffer": false,
+    "save_dir": "./corner_buffer",
     "save_model": true,
     "save_tb": false,
     "save_video": false,
