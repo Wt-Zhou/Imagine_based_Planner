@@ -191,47 +191,6 @@ class CP(object):
                     # Record Data    
                 self.record_test_data(model_step, model_reward, env)
     
-    def collect_corner_data(self, env):
-        # Collect Corner Data
-        args = self.parse_args()
-        savedir = args.save_dir + "_" + args.env
-
-        corner_buffer_size = 1000
-        self.corner_buffer = ReplayBuffer(corner_buffer_size)
-
-        obs = env.reset()
-        self.trajectory_planner.clear_buff()
-        decision_count = 0
-        while True:
-            obs = np.array(obs)
-
-            print("Obs",obs.tolist())
-
-            # Rule-based Planner
-            self.dynamic_map.update_map_from_obs(obs, env)
-            rule_trajectory, action = self.trajectory_planner.trajectory_update(self.dynamic_map)
-            trajectory = self.trajectory_planner.trajectory_update_CP(action, rule_trajectory)
-            # Control
-            for i in range(args.decision_count):
-                control_action =  self.controller.get_control(self.dynamic_map,  trajectory.trajectory, trajectory.desired_speed)
-                output_action = [control_action.acc, control_action.steering]
-                new_obs, rew, done, info = env.step(output_action)
-                if done:
-                    break
-                self.dynamic_map.update_map_from_obs(new_obs, env)
-
-            mask = np.random.binomial(1, args.bootstrapped_data_sharing_probability, args.bootstrapped_heads_num) # add mask for data
-            self.corner_buffer.add(obs, action, rew, new_obs, float(done), mask)
-            obs = new_obs
-
-            if done:
-                # self.maybe_save_model(savedir, {
-                #     'corner_buffer': self.corner_buffer,
-                # })
-                print("Finish Corner Data Collection")
-                break
-        return self.corner_buffer
-    
     def learn(self, total_timesteps, imagine_env, load_model_step):      
         # Init DRL
         args = self.parse_args()
@@ -298,24 +257,24 @@ class CP(object):
                 new_obs, rew, done, _ = imagine_env.step(action)
 
                 # Draw Plot
-                ax.cla() 
-                if abs(new_obs.tolist()[0] - obs.tolist()[0]) > 0:
-                    angle = math.atan((-new_obs.tolist()[1]+obs.tolist()[1])/(new_obs.tolist()[0] - obs.tolist()[0]) )/math.pi*180 + 180
-                else:
-                    angle = obs.tolist()[4]/math.pi*180
-                rect = plt.Rectangle((obs.tolist()[0],-obs.tolist()[1]),2.5,6,angle=angle+90)
-                ax.add_patch(rect)
-                if abs(new_obs.tolist()[5] - obs.tolist()[5]) > 0.1:
-                    angle2 = math.atan((-new_obs.tolist()[6]+obs.tolist()[6])/(new_obs.tolist()[5] - obs.tolist()[5]) )/math.pi*180 + 180
-                else:
-                    angle2 = obs.tolist()[9]/math.pi*180 + 45
+                # ax.cla() 
+                # if abs(new_obs.tolist()[0] - obs.tolist()[0]) > 0:
+                #     angle = math.atan((-new_obs.tolist()[1]+obs.tolist()[1])/(new_obs.tolist()[0] - obs.tolist()[0]) )/math.pi*180 + 180
+                # else:
+                #     angle = obs.tolist()[4]/math.pi*180
+                # rect = plt.Rectangle((obs.tolist()[0],-obs.tolist()[1]),2.5,6,angle=angle+90)
+                # ax.add_patch(rect)
+                # if abs(new_obs.tolist()[5] - obs.tolist()[5]) > 0.1:
+                #     angle2 = math.atan((-new_obs.tolist()[6]+obs.tolist()[6])/(new_obs.tolist()[5] - obs.tolist()[5]) )/math.pi*180 + 180
+                # else:
+                #     angle2 = obs.tolist()[9]/math.pi*180 + 45
 
-                # rect = plt.Rectangle((obs.tolist()[5],-obs.tolist()[6]),2,5,angle=obs.tolist()[9]/math.pi*180)
-                rect = plt.Rectangle((obs.tolist()[5],-obs.tolist()[6]),2.5,6,angle=angle2+90, facecolor="red")
-                ax.add_patch(rect)
-                ax.axis([-92,-13,-199,-137])
-                ax.legend()
-                plt.pause(0.001)
+                # # rect = plt.Rectangle((obs.tolist()[5],-obs.tolist()[6]),2,5,angle=obs.tolist()[9]/math.pi*180)
+                # rect = plt.Rectangle((obs.tolist()[5],-obs.tolist()[6]),2.5,6,angle=angle2+90, facecolor="red")
+                # ax.add_patch(rect)
+                # ax.axis([-92,-13,-199,-137])
+                # ax.legend()
+                # plt.pause(0.001)
                     
                 mask = np.random.binomial(1, args.bootstrapped_data_sharing_probability, args.bootstrapped_heads_num) # add mask for data
                 replay_buffer.add(obs, action[0], rew, new_obs, float(done), mask)
@@ -601,6 +560,10 @@ class CP(object):
                     fw.write(str(q_values_dqn(obs[None])[0][action])) 
                     fw.write("\n")
                     fw.close()       
+
+    def test_corner_case(self, env, imagine_model):
+        return 0
+
 
 class World_Buffer(object):
     """Buffer to store environment transitions."""
@@ -1013,9 +976,17 @@ class Log_Replay_Imagine_Model_New:
         # Collect Corner Data
         args = self.parse_args()
         savedir = args.save_dir
+        buffer_dir = self.make_dir(os.path.join(args.work_dir, 'corner_buffer'))
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         corner_buffer_size = 1000
-        self.corner_buffer = ReplayBuffer(corner_buffer_size)
+        self.corner_buffer = World_Buffer(
+            obs_shape=env.observation_space.shape,
+            action_shape=[1], # discrete, 1 dimension!
+            capacity= args.replay_buffer_capacity,
+            batch_size= corner_buffer_size,
+            device=device
+        )
 
         obs = env.reset()
         self.trajectory_planner.clear_buff()
@@ -1037,15 +1008,13 @@ class Log_Replay_Imagine_Model_New:
                 if done:
                     break
                 self.dynamic_map.update_map_from_obs(new_obs, env)
-
-            self.corner_buffer.add(obs, action, rew, new_obs, float(done), 1)
+            print("corner_buffer",rew)
+            self.corner_buffer.add(obs, action, rew, rew, new_obs, float(done))
             obs = new_obs
 
             if done:
-                # self.maybe_save_model(savedir, {
-                #     'corner_buffer': self.corner_buffer,
-                # })
-                print("Finish Corner Data Collection")
+                self.corner_buffer.save(buffer_dir)
+                print("Finish Corner Data Collection and Saving")
                 break
         
         # Init imagine Model

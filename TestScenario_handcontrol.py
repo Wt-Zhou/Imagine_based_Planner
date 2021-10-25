@@ -94,9 +94,9 @@ start_point_03_2.rotation.roll = 0
 
 class CarEnv_03_HandControl:
 
-    def __init__(self, spawn_env_veh = True, handcontrol = False):
+    def __init__(self, spawn_env_vehicle = True, handcontrol = False):
 
-        self.spawn_env_veh = spawn_env_veh
+        self.spawn_env_vehicle = spawn_env_vehicle
         # CARLA settings
         self.client = carla.Client("localhost", 2000)
         self.client.set_timeout(10.0)
@@ -135,25 +135,7 @@ class CarEnv_03_HandControl:
         self.high = np.array([250,  100, 1, 1,5, 250,  100, 1, 1,5], dtype=np.float64)    
         self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
 
-        # Spawn Ego Vehicle
-        global start_point_03_2
-        try:
-            self.ego_collision_sensor.destroy()
-            self.ego_vehicle.destroy()
-
-        except:
-            pass
-        self.ego_vehicle_bp = random.choice(self.world.get_blueprint_library().filter('vehicle.lincoln.mkz2017'))
-        if self.ego_vehicle_bp.has_attribute('color'):
-            color = '255,0,0'
-            self.ego_vehicle_bp.set_attribute('color', color)
-            self.ego_vehicle_bp.set_attribute('role_name', "ego_vehicle")
-        self.ego_vehicle = self.world.spawn_actor(self.ego_vehicle_bp, start_point_03_2)
-        self.ego_vehicle.set_target_velocity(carla.Vector3D(0,-10,0))
-
-        collision_bp = self.world.get_blueprint_library().find('sensor.other.collision')
-        self.ego_collision_sensor = self.world.spawn_actor(collision_bp, Transform(), self.ego_vehicle, carla.AttachmentType.Rigid)
-        self.ego_collision_sensor.listen(lambda event: self.ego_vehicle_collision(event))
+        # Set Ego Vehicle
         self.ego_vehicle_collision_sign = False
         self.stuck_time = 0
 
@@ -173,16 +155,15 @@ class CarEnv_03_HandControl:
 
 
         # Spawn env vehicle
-        try:
-            self.env_vehicle.destroy()
-        except:
-            pass
-        if self.spawn_env_veh:
-            self.spawn_fixed_veh()
+
+        # if self.spawn_env_veh:
+        #     self.spawn_fixed_veh()
 
         # Corner Case
         self.handcontrol = handcontrol
-        if self.handcontrol and self.spawn_env_veh:
+        if self.handcontrol and self.spawn_env_vehicle:
+            self.spawn_env_veh()
+            
             pygame.init()
             pygame.font.init()
             display = pygame.display.set_mode(
@@ -362,30 +343,29 @@ class CarEnv_03_HandControl:
 
     def reset(self):    
         # Ego vehicle
-        if self.ego_vehicle is not None:
-            self.ego_collision_sensor.destroy()
-            self.ego_vehicle.destroy()
+        # if self.ego_vehicle is not None:
+        #     self.ego_collision_sensor.destroy()
+        #     self.ego_vehicle.destroy()
 
         # Control Env Elements
-        if self.env_vehicle is not None:
-            self.env_vehicle.destroy()
-        if self.spawn_env_veh:
-            self.spawn_fixed_veh()
+        if self.spawn_env_vehicle:
+            self.spawn_env_veh()
         
-        actor_list = self.world.get_actors()
-        vehicle_list = actor_list.filter("*vehicle*")
-        for vehicle in vehicle_list:
-            if vehicle.attributes['role_name'] != "ego_vehicle" :
-                vehicle.set_target_velocity(carla.Vector3D(0,-9,0))
+        # actor_list = self.world.get_actors()
+        # vehicle_list = actor_list.filter("*vehicle*")
+        # for vehicle in vehicle_list:
+        #     if vehicle.attributes['role_name'] != "ego_vehicle" :
+        #         vehicle.set_target_velocity(carla.Vector3D(0,-9,0))
 
 
-        global start_point_03_2
-        self.ego_vehicle = self.world.spawn_actor(self.ego_vehicle_bp, start_point_03_2)
-        self.ego_vehicle.set_target_velocity(carla.Vector3D(0,-10,0))
+        # global start_point_03_2
+        # self.ego_vehicle = self.world.spawn_actor(self.ego_vehicle_bp, start_point_03_2)
+        # self.ego_vehicle.set_target_velocity(carla.Vector3D(0,-10,0))
 
-        collision_bp = self.world.get_blueprint_library().find('sensor.other.collision')
-        self.ego_collision_sensor = self.world.spawn_actor(collision_bp, Transform(), self.ego_vehicle, carla.AttachmentType.Rigid)
-        self.ego_collision_sensor.listen(lambda event: self.ego_vehicle_collision(event))
+        # collision_bp = self.world.get_blueprint_library().find('sensor.other.collision')
+        # self.ego_collision_sensor = self.world.spawn_actor(collision_bp, Transform(), self.ego_vehicle, carla.AttachmentType.Rigid)
+        # self.ego_collision_sensor.listen(lambda event: self.ego_vehicle_collision(event))
+        self.spawn_ego_veh()
         self.ego_vehicle_collision_sign = False
 
         self.world.tick() 
@@ -417,7 +397,7 @@ class CarEnv_03_HandControl:
         reward = ego_vehicle_velocity / 15 
 
         # Hand control of env vehicle
-        if self.handcontrol and self.spawn_env_veh:
+        if self.handcontrol and self.spawn_env_vehicle:
             self.keyboard_control()
 
         # If finish
@@ -452,7 +432,12 @@ class CarEnv_03_HandControl:
         return state, reward, done, None
 
 
-    def spawn_fixed_veh(self):
+    def spawn_env_veh(self):
+        try:
+            self.env_vehicle.destroy()
+        except:
+            pass
+
         transform = Transform()
         transform.location.x = 243 
         transform.location.y = 140 
@@ -462,7 +447,31 @@ class CarEnv_03_HandControl:
         transform.rotation.roll = 0
 
         blueprint = random.choice(self.world.get_blueprint_library().filter('vehicle.mercedes-benz.coupe'))
+        if blueprint.has_attribute('color'):
+            color = '0,0,255' # blue
+            blueprint.set_attribute('color', color)
+        
         self.env_vehicle = self.world.spawn_actor(blueprint, transform)
+    
+    def spawn_ego_veh(self):
+        global start_point_03_2
+        try:
+            self.ego_collision_sensor.destroy()
+            self.ego_vehicle.destroy()
+        except:
+            pass
+
+        self.ego_vehicle_bp = random.choice(self.world.get_blueprint_library().filter('vehicle.lincoln.mkz2017'))
+        if self.ego_vehicle_bp.has_attribute('color'):
+            color = '255,0,0'
+            self.ego_vehicle_bp.set_attribute('color', color)
+            self.ego_vehicle_bp.set_attribute('role_name', "ego_vehicle")
+        self.ego_vehicle = self.world.spawn_actor(self.ego_vehicle_bp, start_point_03_2)
+        # self.ego_vehicle.set_target_velocity(carla.Vector3D(0,-10,0))
+
+        collision_bp = self.world.get_blueprint_library().find('sensor.other.collision')
+        self.ego_collision_sensor = self.world.spawn_actor(collision_bp, Transform(), self.ego_vehicle, carla.AttachmentType.Rigid)
+        self.ego_collision_sensor.listen(lambda event: self.ego_vehicle_collision(event))
 
     def keyboard_control(self):            
         self.keyboard_clock.tick_busy_loop(60)
