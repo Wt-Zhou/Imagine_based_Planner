@@ -14,13 +14,13 @@ from Agent.zzz.cubic_spline_planner import Spline2D
 MAX_SPEED = 50.0 / 3.6  # maximum speed [m/s]
 MAX_ACCEL = 10.0  # maximum acceleration [m/ss]
 MAX_CURVATURE = 500.0  # maximum curvature [1/m]
-MAX_ROAD_WIDTH = 8.0   # maximum road width [m] # related to RL action space
-D_ROAD_W = 6.99  # road width sampling length [m]
+MAX_ROAD_WIDTH = 10.0   # maximum road width [m] # related to RL action space
+D_ROAD_W = 4.99  # road width sampling length [m]
 DT = 0.3  # time tick [s]
-MAXT = 6.3  # max prediction time [m]
-MINT = 6.0  # min prediction time [m]
-TARGET_SPEED = 40.0 / 3.6  # target speed [m/s]
-D_T_S = 15.0 / 3.6  # target speed sampling length [m/s]
+MAXT = 4.2  # max prediction time [m]
+MINT = 4.0  # min prediction time [m]
+TARGET_SPEED = 30.0 / 3.6  # target speed [m/s]
+D_T_S = 20.0 / 3.6  # target speed sampling length [m/s]
 N_S_SAMPLE = 1  # sampling number of target speed
 
 # Collision check
@@ -28,7 +28,7 @@ OBSTACLES_CONSIDERED = 4
 ROBOT_RADIUS = 1  # robot radius [m]
 RADIUS_SPEED_RATIO = 0 # higher speed, bigger circle
 MOVE_GAP = 1
-ONLY_SAMPLE_TO_RIGHT = False
+ONLY_SAMPLE_TO_LEFT = True
 
 # Cost weights
 KJ = 0.1
@@ -288,7 +288,7 @@ class JunctionTrajectoryPlanner(object):
         c_d_dd = start_state.c_d_dd
 
         # generate path to each offset goal
-        if ONLY_SAMPLE_TO_RIGHT:
+        if ONLY_SAMPLE_TO_LEFT:
             left_sample_bound = D_ROAD_W
         else:
             left_sample_bound = MAX_ROAD_WIDTH 

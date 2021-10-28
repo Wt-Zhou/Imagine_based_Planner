@@ -70,6 +70,7 @@ from pygame.locals import K_z
 from pygame.locals import K_MINUS
 from pygame.locals import K_EQUALS
 from Agent.CARLA_manual_control import HUD, KeyboardControl
+from Agent.CARLA_manual_control_steeringwheel import HUD, DualControl
 
 MAP_NAME = 'Town03'
 OBSTACLES_CONSIDERED = 1 # For cut-in in Town03
@@ -77,7 +78,7 @@ OBSTACLES_CONSIDERED = 1 # For cut-in in Town03
 global goal_point_03
 goal_point_03 = Transform()
 goal_point_03.location.x = 245
-goal_point_03.location.y = 36
+goal_point_03.location.y = 26
 goal_point_03.location.z = 0
 goal_point_03.rotation.pitch = 0
 goal_point_03.rotation.yaw = -90 
@@ -104,15 +105,15 @@ class CarEnv_03_HandControl:
 
         if self.world.get_map().name != MAP_NAME:
             self.world = self.client.load_world(MAP_NAME)
-        self.world.set_weather(carla.WeatherParameters(cloudiness=0, precipitation=10.0, sun_altitude_angle=90.0))
-        settings = self.world.get_settings()
-        settings.no_rendering_mode = False
-        settings.fixed_delta_seconds = 0.02 # Warning: When change simulator, the delta_t in controller should also be change.
+        # self.world.set_weather(carla.WeatherParameters(cloudiness=0, precipitation=10.0, sun_altitude_angle=90.0))
+        self.settings = self.world.get_settings()
+        self.settings.no_rendering_mode = False
+        self.settings.fixed_delta_seconds = 0.02 # Warning: When change simulator, the delta_t in controller should also be change.
         # settings.substepping = True
         # settings.max_substep_delta_time = 0.02  # fixed_delta_seconds <= max_substep_delta_time * max_substeps
         # settings.max_substeps = 10
-        settings.synchronous_mode = True
-        self.world.apply_settings(settings)
+        self.settings.synchronous_mode = True
+        self.world.apply_settings(self.settings)
         self.free_traffic_lights(self.world)
 
         self.tm = self.client.get_trafficmanager(8000)
@@ -176,11 +177,9 @@ class CarEnv_03_HandControl:
             hud = HUD(320, 200)
 
             # world = World(client.get_world(), hud, args)
-            self.keyboard_controller = KeyboardControl(self.env_vehicle)
+            self.keyboard_controller = DualControl(self.env_vehicle)
 
             self.keyboard_clock = pygame.time.Clock()
-
-
        
     def free_traffic_lights(self, carla_world):
         traffic_lights = carla_world.get_actors().filter('*traffic_light*')
@@ -237,7 +236,7 @@ class CarEnv_03_HandControl:
     def ego_vehicle_pass(self):
         global goal_point_03
         ego_location = self.ego_vehicle.get_location()
-        if ego_location.distance(goal_point_03.location) < 10:
+        if ego_location.distance(goal_point_03.location) < 30:
             return True
         else:
             return False
@@ -247,7 +246,7 @@ class CarEnv_03_HandControl:
 
     def wrap_state(self):
         # state = [0 for i in range((OBSTACLES_CONSIDERED + 1) * 4)]
-        state  = np.array([0,  0, 0, 0,0,0,0, 0, 0, 0], dtype=np.float64)
+        state  = np.array([0,  0, 0, 0,0,245,  80, -5, -5,-5], dtype=np.float64)
 
         ego_vehicle_state = Vehicle()
         ego_vehicle_state.x = self.ego_vehicle.get_location().x
@@ -432,6 +431,60 @@ class CarEnv_03_HandControl:
         return state, reward, done, None
 
 
+    def step_replay(self, action, env_veh_trans):
+        # Control ego vehicle
+        throttle = max(0,float(action[0]))  # range [0,1]
+        brake = max(0,-float(action[0])) # range [0,1]
+        steer = action[1] # range [-1,1]
+        self.ego_vehicle.apply_control(carla.VehicleControl(throttle = throttle, brake = brake, steer = steer))
+        self.world.tick()
+
+        # State
+        state = self.wrap_state()
+
+        # Step reward
+        ego_vehicle_velocity = math.sqrt(self.ego_vehicle.get_velocity().x ** 2 + self.ego_vehicle.get_velocity().y ** 2 + self.ego_vehicle.get_velocity().z ** 2)
+
+        reward = ego_vehicle_velocity / 15 
+
+        # Hand control of env vehicle
+        if self.handcontrol and self.spawn_env_vehicle:
+            self.keyboard_control()
+        elif not self.handcontrol:
+            env_veh_trans.location.z = self.ego_vehicle.get_location().z
+            self.env_vehicle.set_transform(env_veh_trans)
+
+        # If finish
+        done = False
+        if self.ego_vehicle_collision_sign:
+            self.collision_num += + 1
+            done = True
+            print("[CARLA]: Collision!")
+        
+        if self.ego_vehicle_pass():
+            done = True
+            print("[CARLA]: Successful!")
+
+        elif self.ego_vehicle_stuck():
+            self.stuck_num += 1
+            done = True
+            print("[CARLA]: Stuck!")
+
+
+        actor_list = self.world.get_actors()
+        vehicle_list = actor_list.filter("*vehicle*")
+        for vehicle in vehicle_list:  
+            self.tm.ignore_signs_percentage(vehicle, 100)
+            self.tm.ignore_lights_percentage(vehicle, 100)
+            self.tm.ignore_walkers_percentage(vehicle, 0)
+            self.tm.set_percentage_keep_right_rule(vehicle,100) # it can make the actor go forward, dont know why
+            self.tm.global_percentage_speed_difference(-100) 
+            self.tm.auto_lane_change(vehicle, True)
+            self.tm.distance_to_leading_vehicle(vehicle, 10)
+            self.tm.collision_detection(vehicle, self.ego_vehicle, True)
+
+        return state, reward, done, None
+
     def spawn_env_veh(self):
         try:
             self.env_vehicle.destroy()
@@ -439,8 +492,8 @@ class CarEnv_03_HandControl:
             pass
 
         transform = Transform()
-        transform.location.x = 243 
-        transform.location.y = 140 
+        transform.location.x = 235 
+        transform.location.y = 130 
         transform.location.z = 2
         transform.rotation.pitch = 0
         transform.rotation.yaw = -90
@@ -475,7 +528,7 @@ class CarEnv_03_HandControl:
 
     def keyboard_control(self):            
         self.keyboard_clock.tick_busy_loop(60)
-        self.keyboard_controller.parse_events(self.client, self.env_vehicle, self.keyboard_clock)
+        self.keyboard_controller.parse_events(self.env_vehicle, self.keyboard_clock)
         # world.tick(clock)
         # world.render(display)
         pygame.event.pump()

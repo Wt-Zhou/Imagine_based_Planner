@@ -12,3 +12,7 @@ world_model_gnn1/
 logs_Town03_cut_in/
 
 logs_Town03_back/
+
+corner_buffer/
+
+Reward_loss.txt
