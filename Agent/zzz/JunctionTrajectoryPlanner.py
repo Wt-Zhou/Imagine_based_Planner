@@ -55,6 +55,9 @@ class JunctionTrajectoryPlanner(object):
         self.csp = None
         self.dist_to_end = [0,0,0,0,0]
         self.target_line = target_line
+
+        self.radius = ROBOT_RADIUS
+        self.move_gap = MOVE_GAP
     
     def clear_buff(self):
 
@@ -68,6 +71,10 @@ class JunctionTrajectoryPlanner(object):
         self.reference_path = None
         self.csp = None
     
+    def set_ROBOT_RADIUS(self, radius, move_gap):
+        self.radius = radius
+        self.move_gap = move_gap
+
     def build_frenet_path(self, dynamic_map, clean_current_csp = False):
 
         if self.csp is None or clean_current_csp:
@@ -154,7 +161,7 @@ class JunctionTrajectoryPlanner(object):
                 self.build_frenet_path(dynamic_map, True)   
         
             # initialize prediction module
-            self.obs_prediction = predict(dynamic_map, OBSTACLES_CONSIDERED, MAXT, DT, ROBOT_RADIUS, RADIUS_SPEED_RATIO, MOVE_GAP,
+            self.obs_prediction = predict(dynamic_map, OBSTACLES_CONSIDERED, MAXT, DT, self.radius, RADIUS_SPEED_RATIO, self.move_gap,
                                         dynamic_map.ego_vehicle.v)
 
             return True

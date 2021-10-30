@@ -450,9 +450,24 @@ class CarEnv_03_HandControl:
         # Hand control of env vehicle
         if self.handcontrol and self.spawn_env_vehicle:
             self.keyboard_control()
-        elif not self.handcontrol:
+        elif not self.handcontrol and env_veh_trans.location.z >= -0.1:
             env_veh_trans.location.z = self.ego_vehicle.get_location().z
+            env_veh_trans.rotation.pitch = self.ego_vehicle.get_transform().rotation.pitch
+            env_veh_trans.rotation.roll = self.ego_vehicle.get_transform().rotation.roll
+            # print("env_veh_trans",env_veh_trans.location.x)
+            # print("env_veh_trans",env_veh_trans.location.y)
+            # print("env_veh_trans",env_veh_trans.location.z)
+            # print("env_veh_trans",env_veh_trans.rotation.yaw)
+            # print("env_veh_trans",env_veh_trans.rotation.pitch)
+            # print("env_veh_trans",env_veh_trans.rotation.roll)
+            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().location.x)
+            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().location.y)
+            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().location.z)
+            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().rotation.yaw)
+            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().rotation.pitch)
+            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().rotation.roll)
             self.env_vehicle.set_transform(env_veh_trans)
+            self.env_vehicle.set_target_velocity(carla.Vector3D(0,0,0))
 
         # If finish
         done = False

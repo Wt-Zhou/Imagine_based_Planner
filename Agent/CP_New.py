@@ -598,6 +598,8 @@ class CP(object):
             self.trajectory_planner.clear_buff()
 
             model_reward = 0
+            
+            self.trajectory_planner.set_ROBOT_RADIUS(3, 3)
 
             # Test
             while True:
@@ -608,7 +610,10 @@ class CP(object):
                
                 rule_trajectory, action = self.trajectory_planner.trajectory_update(self.dynamic_map)
                 print("rule_action",action)
-                if imagine_model.simulation_step < imagine_model.corner_length - imagine_model.learn_time_length:
+                if imagine_model.simulation_step > imagine_model.corner_length:
+                    env_veh_trans.location.z = -10
+
+                if imagine_model.simulation_step < imagine_model.corner_length - imagine_model.learn_time_length or imagine_model.simulation_step > imagine_model.corner_length:
                     action = action
                 else:
                     # DRL Action
@@ -622,12 +627,12 @@ class CP(object):
                 next_env_state = imagine_model.transition_predict(obs, action)
                 imagine_model.simulation_step += 1
                 print("next_env_state",next_env_state)
+
                 # else:
                 #     next_env_state = obs
                 env_veh_trans = Transform()
                 env_veh_trans.location.x = float(next_env_state[5])
                 env_veh_trans.location.y = float(next_env_state[6])
-
                 env_veh_trans.rotation.yaw = float(next_env_state[9]) / 3.1415 * 180.0 
 
                 # Control
@@ -1024,14 +1029,14 @@ class Log_Replay_Imagine_Model_New:
             vy = new_obs_2[8]#(new_obs_2[8] - new_obs[8])/self.env.settings.fixed_delta_seconds
             predict_state = new_obs_2.copy()
 
-            yaw = -90
-            vx = 0
-            vy = -10
-            predict_state[5] = x + vx * self.env.settings.fixed_delta_seconds * (self.simulation_step - self.corner_length + 1)
-            predict_state[6] = y + vy * self.env.settings.fixed_delta_seconds * (self.simulation_step - self.corner_length + 1)
+            # yaw = -90
+            # vx = 0
+            # vy = -10
+            predict_state[5] = x #+ vx * self.env.settings.fixed_delta_seconds * (self.simulation_step - self.corner_length + 1)
+            predict_state[6] = y #+ vy * self.env.settings.fixed_delta_seconds * (self.simulation_step - self.corner_length + 1)
             predict_state[7] = vx
             predict_state[8] = vy
-            predict_state[9] = yaw
+            predict_state[9] = (new_obs_2[9] + new_obs[9])/2
             print("predict_state",predict_state)
 
 
@@ -1081,7 +1086,7 @@ class Log_Replay_Imagine_Model_New:
         # If finish
         done = False
         print("p4",p4)
-        if p4 < 5.5:# Collision check
+        if p4 < 8:# Collision check
             print("Imagine: Collision")
             reward = - 20
             done = True
