@@ -4,7 +4,7 @@ import numpy as np
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from TestScenario_handcontrol import CarEnv_03_HandControl
+from Test_Scenarios.TestScenario_handcontrol import CarEnv_03_HandControl
 from Agent.CP_New import CP
 from Agent.CP_New import Log_Replay_Imagine_Model_New
 

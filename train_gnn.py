@@ -1,12 +1,11 @@
 import gym
 import numpy as np
-import gym_routing
 import os
 import torch
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-from TestScenario import CarEnv_03_Follow_Ego,CarEnv_03_Cut_In,CarEnv_03_Cut_In_old
-from TestScenario_Town02 import CarEnv_02_Intersection
+from Test_Scenarios.TestScenario import CarEnv_03_Follow_Ego,CarEnv_03_Cut_In,CarEnv_03_Cut_In_old
+from Test_Scenarios.TestScenario_Town02 import CarEnv_02_Intersection
 from Agent.Imagine_Planner import GMBRL
 from Agent.world_model.self_attention.self_atten_world_model import GNN_World_Model
 
