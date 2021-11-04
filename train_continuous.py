@@ -1,6 +1,6 @@
 import gym
 import numpy as np
-import gym_routing
+# import gym_routing
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -19,7 +19,6 @@ imagine_model = Log_Replay_Imagine_Model_New(empty_env)
 # imagine_model.train_ego_dynamics(empty_env, 300000)
 load_step = 350000
 imagine_model.load_ego_dynamics(empty_env, load_step)
-
 
 # for i in range(0, 100):
     

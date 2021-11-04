@@ -1,6 +1,6 @@
 import numpy as np
 import math
-import sumolib
+# import sumolib
 import threading
 import time
 
