@@ -430,7 +430,6 @@ class CarEnv_03_HandControl:
 
         return state, reward, done, None
 
-
     def step_replay(self, action, env_veh_trans):
         # Control ego vehicle
         throttle = max(0,float(action[0]))  # range [0,1]
