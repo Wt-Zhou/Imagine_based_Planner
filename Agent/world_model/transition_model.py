@@ -44,8 +44,8 @@ class ProbabilisticTransitionModel(nn.Module):
         self.max_sigma = max_sigma
         self.min_sigma = min_sigma
         assert(self.max_sigma >= self.min_sigma)
-        if announce:
-            print("Probabilistic transition model chosen.")
+        # if announce:
+            # print("Probabilistic transition model chosen.")
 
     def forward(self, x):
         x = self.fc(x)

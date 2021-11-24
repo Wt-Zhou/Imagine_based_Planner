@@ -1,12 +1,14 @@
 import argparse
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+import tensorflow as tf
 import numpy as np
 import math
 import torch
 import json
 import os
 import os.path as osp
-import tensorflow as tf
 import tempfile
 import time
 import random
@@ -30,7 +32,6 @@ from baselines.common.misc_util import (
     SimpleMonitor
 )
 from baselines.common.schedules import LinearSchedule, PiecewiseSchedule
-from baselines.common.atari_wrappers_deprecated import wrap_dqn
 from Agent.model import dqn_model, bootstrap_model
 from Agent.zzz.JunctionTrajectoryPlanner import JunctionTrajectoryPlanner
 from Agent.zzz.controller import Controller
@@ -38,6 +39,8 @@ from Agent.zzz.dynamic_map import DynamicMap
 from Agent.zzz.actions import LaneAction
 from Agent.world_model.world_model import World_Model
 from carla import Transform
+from tqdm import tqdm
+
 
 class CP(object):
 
@@ -46,6 +49,7 @@ class CP(object):
         self.controller = Controller()
         self.dynamic_map = DynamicMap()
         self.target_speed = 30/3.6 
+        print("[Imagination-based Planner]: Initializing")
 
     def parse_args(self):
         parser = argparse.ArgumentParser("DQN experiments for Atari games")
@@ -91,7 +95,7 @@ class CP(object):
         U.save_state(os.path.join(savedir, model_dir, "saved"))
         state_dir = "training_state.pkl-{}".format(state["num_iters"]) + ".zip"
         relatively_safe_pickle_dump(state, os.path.join(savedir, state_dir), compression=True)
-        logger.log("Saved model in {} seconds\n".format(time.time() - start_time))
+        logger.log("[Imagination-based Planner]: Saved model in {} seconds\n".format(time.time() - start_time))
 
     def maybe_load_model(self, savedir, model_step):
         """Load model if present at the specified path."""
@@ -105,7 +109,7 @@ class CP(object):
             state = pickle_load(state_path, compression=True)
             model_dir = "model-{}".format(state["num_iters"])
             U.load_state(os.path.join(savedir, model_dir, "saved"))
-            logger.log("Loaded models checkpoint at {} iterations".format(state["num_iters"]))
+            # logger.log("Loaded models checkpoint at {} iterations".format(state["num_iters"]))
             return state
 
     def test(self, model_list, test_steps, env):
@@ -202,7 +206,6 @@ class CP(object):
 
         if args.seed > 0:
             set_global_seeds(args.seed)
-        
         with U.make_session(120) as sess:
         # Create training graph and replay buffer
             act_dqn, train_dqn, update_target_dqn, self.q_values_dqn = deepq.build_train_dqn(
@@ -233,8 +236,9 @@ class CP(object):
             obs = imagine_env.reset()
 
             fig, ax = plt.subplots()
-
-            while num_iters <= total_timesteps:
+            
+            for num_iters in tqdm(range(1, total_timesteps + 1), unit='steps'):
+            # while num_iters <= total_timesteps:
                 
                 obs = np.array(obs)
 
@@ -251,9 +255,9 @@ class CP(object):
                 else:
                     action = optimal_action
 
-                print("[Imagination]: Obs",obs.tolist())
-                print("[Imagination]: DRL Action",action)
-                print("[Imagination]: Q_List",q_list[0])
+                # print("[Imagination]: Obs",obs.tolist())
+                # print("[Imagination]: DRL Action",action)
+                # print("[Imagination]: Q_List",q_list[0])
 
                 
                 new_obs, rew, done, _ = imagine_env.step(action)
@@ -292,7 +296,7 @@ class CP(object):
                         # Update rl
                         if replay_buffer.__len__() > args.batch_size:
                             for i in range(args.learning_repeat):
-                                print("[Imagination]: Learning")
+                                # print("[Imagination]: Learning")
                                 experience = replay_buffer.sample(args.batch_size, beta=beta_schedule.value(num_iters), count_train=True)
                                 (obses_t, actions, rewards, obses_tp1, dones, masks, train_time, weights, batch_idxes) = experience
                                 # Minimize the error in Bellman's equation and compute TD-error
@@ -309,21 +313,21 @@ class CP(object):
                     
                 # Update target network.
                 if num_iters % args.target_update_freq == 0:
-                    print("[Imagination]: Update target network")
+                    print("[Imagination-based Planner]: Update target network")
                     update_target_dqn()
                
                 start_time, start_steps = time.time(), 0
 
                 # Save the model and training state.
                 if num_iters >= 0 and num_iters % args.save_freq == 0:
-                    print("[Imagination]: Save model")
+                    print("[Imagination-based Planner]: Save model")
                     self.maybe_save_model(savedir, {
                         'replay_buffer': replay_buffer,
                         'num_iters': num_iters,
                     })
                     save_model = False
                 
-                num_iters += 1
+                # num_iters += 1
    
     def learn_dqn(self, total_timesteps, env, load_model_step):      
         # Init DRL
@@ -564,7 +568,7 @@ class CP(object):
 
     def test_corner_case(self, test_env, imagine_model):
         # Init DRL
-        print("Start Test Corner Case in CARLA!")
+        print("[Imagination-based Planner]: Start Test Corner Case in CARLA!")
         args = self.parse_args()
         savedir = args.save_dir + "_" + args.env
         save_model = True
@@ -599,7 +603,7 @@ class CP(object):
 
             model_reward = 0
             
-            self.trajectory_planner.set_ROBOT_RADIUS(3, 3)
+            self.trajectory_planner.set_ROBOT_RADIUS(3, 3.5)
 
             # Test
             while True:
@@ -609,9 +613,6 @@ class CP(object):
                 self.dynamic_map.update_map_from_obs(obs, test_env)
                
                 rule_trajectory, action = self.trajectory_planner.trajectory_update(self.dynamic_map)
-                print("rule_action",action)
-                if imagine_model.simulation_step > imagine_model.corner_length:
-                    env_veh_trans.location.z = -10
 
                 if imagine_model.simulation_step < imagine_model.corner_length - imagine_model.learn_time_length or imagine_model.simulation_step > imagine_model.corner_length:
                     action = action
@@ -619,21 +620,23 @@ class CP(object):
                     # DRL Action
                     q_list = self.q_values_dqn(obs[None])
                     action = np.array(np.where(q_list[0]==np.max(q_list[0]))[0])
-                    print("[CARLA_test]: Obs",obs.tolist())
-                    print("[CARLA_test]: Q_List",q_list)
-                    print("[CARLA_test]: Action",action)
+                    # print("[CARLA_test]: Obs",obs.tolist())
+                    # print("[CARLA_test]: Q_List",q_list)
+                    # print("[CARLA_test]: Action",action)
                 # Replay Env vehicle place
                 # if imagine_model.simulation_step < len(imagine_model.corner_buffer.obses):
                 next_env_state = imagine_model.transition_predict(obs, action)
                 imagine_model.simulation_step += 1
-                print("next_env_state",next_env_state)
 
                 # else:
                 #     next_env_state = obs
-                env_veh_trans = Transform()
-                env_veh_trans.location.x = float(next_env_state[5])
-                env_veh_trans.location.y = float(next_env_state[6])
-                env_veh_trans.rotation.yaw = float(next_env_state[9]) / 3.1415 * 180.0 
+                if imagine_model.simulation_step < imagine_model.corner_length:
+                    env_veh_trans = Transform()
+                    env_veh_trans.location.x = float(next_env_state[5])
+                    env_veh_trans.location.y = float(next_env_state[6])
+                    env_veh_trans.rotation.yaw = float(next_env_state[9]) / 3.1415 * 180.0 
+                else:
+                    env_veh_trans = -1
 
                 # Control
                 trajectory = self.trajectory_planner.trajectory_update_CP(action, rule_trajectory)
@@ -1016,28 +1019,16 @@ class Log_Replay_Imagine_Model_New:
         return predict_state
        
     def transition_predict(self, state, action):
-        print("Simulation_step:",self.simulation_step, self.corner_length)
+        # print("Simulation_step:",self.simulation_step, self.corner_length)
         # Env dynamics (Directly Read From Memory)
         if self.simulation_step < self.corner_length:
             predict_state = self.corner_buffer.next_obses[self.simulation_step]
         else:
             new_obs = self.corner_buffer.next_obses[self.corner_length - 2]
             new_obs_2 = self.corner_buffer.next_obses[self.corner_length - 1]
-            x = new_obs_2[5]
-            y = new_obs_2[6]
-            vx = new_obs_2[7]#(new_obs_2[7] - new_obs[7])/self.env.settings.fixed_delta_seconds #FIXME:Simulation Time Step
-            vy = new_obs_2[8]#(new_obs_2[8] - new_obs[8])/self.env.settings.fixed_delta_seconds
             predict_state = new_obs_2.copy()
-
-            # yaw = -90
-            # vx = 0
-            # vy = -10
-            predict_state[5] = x #+ vx * self.env.settings.fixed_delta_seconds * (self.simulation_step - self.corner_length + 1)
-            predict_state[6] = y #+ vy * self.env.settings.fixed_delta_seconds * (self.simulation_step - self.corner_length + 1)
-            predict_state[7] = vx
-            predict_state[8] = vy
             predict_state[9] = (new_obs_2[9] + new_obs[9])/2
-            print("predict_state",predict_state)
+            # print("predict_state",predict_state)
 
 
         # Ego dynamics (Vehicle Dynamics)
@@ -1085,20 +1076,20 @@ class Log_Replay_Imagine_Model_New:
 
         # If finish
         done = False
-        print("p4",p4)
+        # print("p4",p4)
         if p4 < 8:# Collision check
-            print("Imagine: Collision")
+            # print("Imagine: Collision")
             reward = - 20
             done = True
         
         elif (self.current_s[0] - 245) ** 2 + (self.current_s[1] - 26) ** 2 < 900:
             reward = 10
-            print("Imagine: Pass")
+            # print("Imagine: Pass")
             done = True
 
         elif self.current_s[0] > 246 or self.current_s[0] < 230 or self.current_s[1] > 180 or self.current_s[1] < 10:
             reward = - 20
-            print("Imagine: Out of Area")
+            # print("Imagine: Out of Area")
             done = True
 
         self.simulation_step += 1
@@ -1138,11 +1129,11 @@ class Log_Replay_Imagine_Model_New:
         self.trajectory_planner.clear_buff()
 
         self.corner_length = 0
-
+        print("[Imagination-based Planner]: Starting record, Please Drive")
         while True:
             obs = np.array(obs)
 
-            print("Obs",obs.tolist())
+            # print("Obs",obs.tolist())
 
             # Rule-based Planner
             self.dynamic_map.update_map_from_obs(obs, env)
@@ -1162,11 +1153,11 @@ class Log_Replay_Imagine_Model_New:
 
             if done:
                 self.corner_buffer.save(buffer_dir)
-                print("Finish Corner Data Collection and Saving")
+                print("[Imagination-based Planner]: Finish Corner Data Collection and Saving")
                 break
         
         # Init imagine Model
         self.s_0 = self.corner_buffer.obses[self.corner_length - self.learn_time_length] # Start State
-        print("Start State",self.s_0)
+        # print("Start State",self.s_0)
         self.current_s = self.s_0
         self.simulation_step = 0

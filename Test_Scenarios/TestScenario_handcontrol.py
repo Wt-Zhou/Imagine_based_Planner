@@ -134,7 +134,7 @@ class CarEnv_03_HandControl:
         self.state_dimension = 10
         self.low  = np.array([245,  80, -5, -5,-5,245,  80, -5, -5,-5], dtype=np.float64)
         self.high = np.array([250,  100, 1, 1,5, 250,  100, 1, 1,5], dtype=np.float64)    
-        self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
+        self.observation_space = spaces.Box(self.low, self.high, dtype=np.float64)
 
         # Set Ego Vehicle
         self.ego_vehicle_collision_sign = False
@@ -177,7 +177,7 @@ class CarEnv_03_HandControl:
             hud = HUD(320, 200)
 
             # world = World(client.get_world(), hud, args)
-            self.keyboard_controller = DualControl(self.env_vehicle)
+            self.keyboard_controller = DualControl(self.env_vehicle, equipment = 1) # equipment:1-keyboard, 2-steeringwheel
 
             self.keyboard_clock = pygame.time.Clock()
        
@@ -193,10 +193,10 @@ class CarEnv_03_HandControl:
 
         start = start_point_03_2
         goal = goal_point_03
-        print("Calculating route to x={}, y={}, z={}".format(
-                goal.location.x,
-                goal.location.y,
-                goal.location.z))
+        # print("Calculating route to x={}, y={}, z={}".format(
+        #         goal.location.x,
+        #         goal.location.y,
+        #         goal.location.z))
         
         dao = GlobalRoutePlannerDAO(self.world.get_map(), 1)
         grp = GlobalRoutePlanner(dao)
@@ -333,7 +333,7 @@ class CarEnv_03_HandControl:
             fw.write(str(pass_rate)) 
             fw.write("\n")
             fw.close()               
-            print("[CARLA]: Record To Txt: All", self.task_num, self.stuck_num, self.collision_num, self.case_id )
+            # print("[CARLA]: Record To Txt: All", self.task_num, self.stuck_num, self.collision_num, self.case_id )
 
     def clean_task_nums(self):
         self.task_num = 0
@@ -341,29 +341,10 @@ class CarEnv_03_HandControl:
         self.collision_num = 0
 
     def reset(self):    
-        # Ego vehicle
-        # if self.ego_vehicle is not None:
-        #     self.ego_collision_sensor.destroy()
-        #     self.ego_vehicle.destroy()
-
         # Control Env Elements
         if self.spawn_env_vehicle:
             self.spawn_env_veh()
-        
-        # actor_list = self.world.get_actors()
-        # vehicle_list = actor_list.filter("*vehicle*")
-        # for vehicle in vehicle_list:
-        #     if vehicle.attributes['role_name'] != "ego_vehicle" :
-        #         vehicle.set_target_velocity(carla.Vector3D(0,-9,0))
 
-
-        # global start_point_03_2
-        # self.ego_vehicle = self.world.spawn_actor(self.ego_vehicle_bp, start_point_03_2)
-        # self.ego_vehicle.set_target_velocity(carla.Vector3D(0,-10,0))
-
-        # collision_bp = self.world.get_blueprint_library().find('sensor.other.collision')
-        # self.ego_collision_sensor = self.world.spawn_actor(collision_bp, Transform(), self.ego_vehicle, carla.AttachmentType.Rigid)
-        # self.ego_collision_sensor.listen(lambda event: self.ego_vehicle_collision(event))
         self.spawn_ego_veh()
         self.ego_vehicle_collision_sign = False
 
@@ -376,7 +357,7 @@ class CarEnv_03_HandControl:
         self.record_information_txt()
         self.task_num += 1
         self.case_id += 1
-
+       
         return state
 
     def step(self, action):
@@ -449,58 +430,41 @@ class CarEnv_03_HandControl:
         # Hand control of env vehicle
         if self.handcontrol and self.spawn_env_vehicle:
             self.keyboard_control()
+        elif env_veh_trans == -1:
+            self.env_vehicle.set_autopilot()
+            self.tm.auto_lane_change(self.env_vehicle, True)
+            self.tm.ignore_signs_percentage(self.env_vehicle, 100)
+            self.tm.ignore_lights_percentage(self.env_vehicle, 100)
+            
         elif not self.handcontrol and env_veh_trans.location.z >= -0.1:
             env_veh_trans.location.z = self.ego_vehicle.get_location().z
             env_veh_trans.rotation.pitch = self.ego_vehicle.get_transform().rotation.pitch
             env_veh_trans.rotation.roll = self.ego_vehicle.get_transform().rotation.roll
-            # print("env_veh_trans",env_veh_trans.location.x)
-            # print("env_veh_trans",env_veh_trans.location.y)
-            # print("env_veh_trans",env_veh_trans.location.z)
-            # print("env_veh_trans",env_veh_trans.rotation.yaw)
-            # print("env_veh_trans",env_veh_trans.rotation.pitch)
-            # print("env_veh_trans",env_veh_trans.rotation.roll)
-            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().location.x)
-            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().location.y)
-            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().location.z)
-            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().rotation.yaw)
-            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().rotation.pitch)
-            # print("self.ego_vehicle.get_transform().",self.ego_vehicle.get_transform().rotation.roll)
+
             self.env_vehicle.set_transform(env_veh_trans)
             self.env_vehicle.set_target_velocity(carla.Vector3D(0,0,0))
-
+        
         # If finish
         done = False
         if self.ego_vehicle_collision_sign:
             self.collision_num += + 1
             done = True
-            print("[CARLA]: Collision!")
+            # print("[CARLA]: Collision!")
         
         if self.ego_vehicle_pass():
             done = True
-            print("[CARLA]: Successful!")
+            # print("[CARLA]: Successful!")
 
         elif self.ego_vehicle_stuck():
             self.stuck_num += 1
             done = True
-            print("[CARLA]: Stuck!")
-
-
-        actor_list = self.world.get_actors()
-        vehicle_list = actor_list.filter("*vehicle*")
-        for vehicle in vehicle_list:  
-            self.tm.ignore_signs_percentage(vehicle, 100)
-            self.tm.ignore_lights_percentage(vehicle, 100)
-            self.tm.ignore_walkers_percentage(vehicle, 0)
-            self.tm.set_percentage_keep_right_rule(vehicle,100) # it can make the actor go forward, dont know why
-            self.tm.global_percentage_speed_difference(-100) 
-            self.tm.auto_lane_change(vehicle, True)
-            self.tm.distance_to_leading_vehicle(vehicle, 10)
-            self.tm.collision_detection(vehicle, self.ego_vehicle, True)
+            # print("[CARLA]: Stuck!")
 
         return state, reward, done, None
 
     def spawn_env_veh(self):
         try:
+            self.env_vehicle.set_autopilot(enabled=False)
             self.env_vehicle.destroy()
         except:
             pass
@@ -519,6 +483,9 @@ class CarEnv_03_HandControl:
             blueprint.set_attribute('color', color)
         
         self.env_vehicle = self.world.spawn_actor(blueprint, transform)
+        
+
+
     
     def spawn_ego_veh(self):
         global start_point_03_2

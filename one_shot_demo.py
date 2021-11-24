@@ -3,7 +3,14 @@ import numpy as np
 # import gym_routing
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+import warnings
+warnings.filterwarnings("ignore", message=r"Passing", category=FutureWarning)
+warnings.filterwarnings("ignore", message=r"Passing", category=UserWarning)
+import logging 
+logging.getLogger('tensorflow').disabled = True
+logging.getLogger('gym').disabled = True
+logging.getLogger('pygame').disabled = True
 from Test_Scenarios.TestScenario_handcontrol import CarEnv_03_HandControl
 from Agent.CP_New import CP
 from Agent.CP_New import Log_Replay_Imagine_Model_New

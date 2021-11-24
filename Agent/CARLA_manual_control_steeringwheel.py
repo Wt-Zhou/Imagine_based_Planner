@@ -205,7 +205,7 @@ class World(object):
 
 
 class DualControl(object):
-    def __init__(self, env_vehicle):
+    def __init__(self, env_vehicle, equipment=1): #equipment:1-keyboard, 2-steeringwheel
         self._control = carla.VehicleControl()
         self.env_vehicle = env_vehicle
 
@@ -231,6 +231,8 @@ class DualControl(object):
         self._reverse_idx = int(self._parser.get('G29 Racing Wheel', 'reverse'))
         self._handbrake_idx = int(
             self._parser.get('G29 Racing Wheel', 'handbrake'))
+        
+        self.equipment = equipment
 
     def parse_events_bak(self, world, clock):
         for event in pygame.event.get():
@@ -299,8 +301,10 @@ class DualControl(object):
     
     def parse_events(self, env_vehicle, clock):
         if isinstance(self._control, carla.VehicleControl):
-            self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time())
-            self._parse_vehicle_wheel()
+            if self.equipment == 1:
+                self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time())
+            elif self.equipment == 2:
+                self._parse_vehicle_wheel()
             self._control.reverse = self._control.gear < 0
         elif isinstance(self._control, carla.WalkerControl):
             self._parse_walker_keys(pygame.key.get_pressed(), clock.get_time())
