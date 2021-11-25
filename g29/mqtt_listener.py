@@ -46,6 +46,10 @@ class MQTTClient(object):
         else:
             raise RuntimeError
         self.msgSet = {}
+        
+        self.real_time_steering = 0
+        self.real_time_throttle = 0
+        self.real_time_braking = 0
 
     def on_log(self, client, userdata, level, buf):
         pass
@@ -66,8 +70,11 @@ class MQTTClient(object):
     """
     def on_message(self, client, userdata, msg):
         data = json.loads(msg.payload)
-        print("received:steering={}, throttle={}, braking={}".format(data["steering"], data["throttle"], data["braking"]))
-
+        # print("received:steering={}, throttle={}, braking={}".format(data["steering"], data["throttle"], data["braking"]))
+        self.real_time_braking = data["braking"]
+        self.real_time_steering = data["steering"]
+        self.real_time_throttle = data["throttle"]
+        
     def add_subscription(self, topic):
         self._client.subscribe(topic,0)
     
@@ -78,10 +85,15 @@ class MQTTClient(object):
         self._client.loop_start()
 
     def spin(self):
-        self._client.loop_forever()
+        self._client.loop()
 
 if __name__ == '__main__':
     client = MQTTClient("xp_listener")
     client.add_subscription("hello_world")
     client.spin()
+    n=0
+    while True:
+        client.spin()
+        print("n",n)
+        n += 1
 

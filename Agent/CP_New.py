@@ -237,7 +237,7 @@ class CP(object):
 
             fig, ax = plt.subplots()
             
-            for num_iters in tqdm(range(1, total_timesteps + 1), unit='steps'):
+            for num_iters in tqdm(range(1, total_timesteps + 1), unit='steps',position=0):
             # while num_iters <= total_timesteps:
                 
                 obs = np.array(obs)
@@ -313,22 +313,20 @@ class CP(object):
                     
                 # Update target network.
                 if num_iters % args.target_update_freq == 0:
-                    print("[Imagination-based Planner]: Update target network")
+                    # print("[Imagination-based Planner]: Update target network")
                     update_target_dqn()
                
                 start_time, start_steps = time.time(), 0
-
-                # Save the model and training state.
-                if num_iters >= 0 and num_iters % args.save_freq == 0:
-                    print("[Imagination-based Planner]: Save model")
-                    self.maybe_save_model(savedir, {
-                        'replay_buffer': replay_buffer,
-                        'num_iters': num_iters,
-                    })
-                    save_model = False
                 
                 # num_iters += 1
-   
+                   
+            print("[Imagination-based Planner]: Save model")
+            self.maybe_save_model(savedir, {
+                'replay_buffer': replay_buffer,
+                'num_iters': num_iters,
+            })
+            save_model = False
+
     def learn_dqn(self, total_timesteps, env, load_model_step):      
         # Init DRL
         args = self.parse_args()
@@ -603,7 +601,7 @@ class CP(object):
 
             model_reward = 0
             
-            self.trajectory_planner.set_ROBOT_RADIUS(3, 3.5)
+            self.trajectory_planner.set_ROBOT_RADIUS(3, 3)
 
             # Test
             while True:
@@ -749,7 +747,7 @@ class Log_Replay_Imagine_Model_New:
     def __init__(self, env):
         
         self.env = env
-        self.learn_time_length = 20
+        self.learn_time_length = 10
         
         # Planner
         self.trajectory_planner = JunctionTrajectoryPlanner()

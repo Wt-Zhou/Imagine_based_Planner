@@ -81,7 +81,7 @@ if __name__ == '__main__':
     steering = 0
     throttle = 0
     while True:
-        time.sleep(0.1)
+        time.sleep(0.01)
 
         data = {
             "steering":steering, 

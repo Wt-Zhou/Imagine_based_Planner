@@ -95,7 +95,7 @@ start_point_03_2.rotation.roll = 0
 
 class CarEnv_03_HandControl:
 
-    def __init__(self, spawn_env_vehicle = True, handcontrol = False):
+    def __init__(self, spawn_env_vehicle = True, handcontrol = False, equipment = 1):
 
         self.spawn_env_vehicle = spawn_env_vehicle
         # CARLA settings
@@ -174,10 +174,10 @@ class CarEnv_03_HandControl:
             display.fill((0,0,0))
             pygame.display.flip()
 
-            hud = HUD(320, 200)
+            # hud = HUD(320, 200)
 
             # world = World(client.get_world(), hud, args)
-            self.keyboard_controller = DualControl(self.env_vehicle, equipment = 1) # equipment:1-keyboard, 2-steeringwheel
+            self.keyboard_controller = DualControl(self.env_vehicle, equipment = equipment) #equipment:1-keyboard, 2-steeringwheel, 3-remote steeringwheel
 
             self.keyboard_clock = pygame.time.Clock()
        
@@ -484,9 +484,6 @@ class CarEnv_03_HandControl:
         
         self.env_vehicle = self.world.spawn_actor(blueprint, transform)
         
-
-
-    
     def spawn_ego_veh(self):
         global start_point_03_2
         try:

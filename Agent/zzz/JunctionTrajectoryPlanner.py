@@ -58,6 +58,8 @@ class JunctionTrajectoryPlanner(object):
 
         self.radius = ROBOT_RADIUS
         self.move_gap = MOVE_GAP
+        self.target_speed = TARGET_SPEED
+        self.dts = D_T_S
     
     def clear_buff(self):
 
@@ -74,6 +76,8 @@ class JunctionTrajectoryPlanner(object):
     def set_ROBOT_RADIUS(self, radius, move_gap):
         self.radius = radius
         self.move_gap = move_gap
+        self.target_speed = 15/3.6
+        self.dts = 5/3.6
 
     def build_frenet_path(self, dynamic_map, clean_current_csp = False):
 
@@ -314,7 +318,7 @@ class JunctionTrajectoryPlanner(object):
                 fp.d_ddd = [lat_qp.calc_third_derivative(t) for t in fp.t]
 
                 # Loongitudinal motion planning (Velocity keeping)
-                for tv in np.arange(TARGET_SPEED - D_T_S * N_S_SAMPLE, TARGET_SPEED + D_T_S * N_S_SAMPLE, D_T_S):
+                for tv in np.arange(self.target_speed - self.dts * N_S_SAMPLE, self.target_speed + self.dts * N_S_SAMPLE, self.dts):
                     tfp = copy.deepcopy(fp)
                     lon_qp = quartic_polynomial(s0, c_speed, 0.0, tv, 0.0, Ti)
 
@@ -327,7 +331,7 @@ class JunctionTrajectoryPlanner(object):
                     Js = sum(np.power(tfp.s_ddd, 2))  # square of jerk
 
                     # square of diff from target speed
-                    ds = (TARGET_SPEED - tfp.s_d[-1])**2
+                    ds = (self.target_speed - tfp.s_d[-1])**2
 
                     tfp.cd = KJ * Jp + KT * Ti + KD * tfp.d[-1]**2
                     tfp.cv = KJ * Js + KT * Ti + KD * ds

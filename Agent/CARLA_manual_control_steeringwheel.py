@@ -1,34 +1,17 @@
-#!/usr/bin/env python
-
-# Copyright (c) 2019 Intel Labs
-#
-# This work is licensed under the terms of the MIT license.
-# For a copy, see <https://opensource.org/licenses/MIT>.
-
-# Allows controlling a vehicle with a keyboard. For a simpler and more
-# documented example, please take a look at tutorial.py.
-
-"""
-Welcome to CARLA manual control with steering wheel Logitech G29.
-
-To drive start by preshing the brake pedal.
-Change your wheel_config.ini according to your steering wheel.
-
-To find out the values of your steering wheel use jstest-gtk in Ubuntu.
-
-"""
-
 from __future__ import print_function
-
-
-# ==============================================================================
-# -- find carla module ---------------------------------------------------------
-# ==============================================================================
-
 
 import glob
 import os
 import sys
+import carla
+import argparse
+import collections
+import datetime
+import logging
+import math
+import random
+import re
+import weakref
 
 try:
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -38,24 +21,8 @@ try:
 except IndexError:
     pass
 
-
-# ==============================================================================
-# -- imports -------------------------------------------------------------------
-# ==============================================================================
-
-
-import carla
-
 from carla import ColorConverter as cc
-
-import argparse
-import collections
-import datetime
-import logging
-import math
-import random
-import re
-import weakref
+from g29.mqtt_listener import MQTTClient
 
 if sys.version_info >= (3, 0):
 
@@ -205,22 +172,27 @@ class World(object):
 
 
 class DualControl(object):
-    def __init__(self, env_vehicle, equipment=1): #equipment:1-keyboard, 2-steeringwheel
+    def __init__(self, env_vehicle, equipment=1): #equipment:1-keyboard, 2-steeringwheel, 3-remote steeringwheel
         self._control = carla.VehicleControl()
         self.env_vehicle = env_vehicle
 
         self._steer_cache = 0.0
 
         # initialize steering wheel
-        pygame.joystick.init()
+        if equipment == 2:
+            pygame.joystick.init()
 
-        joystick_count = pygame.joystick.get_count()
-        if joystick_count > 1:
-            raise ValueError("Please Connect Just One Joystick")
+            joystick_count = pygame.joystick.get_count()
+            if joystick_count > 1:
+                raise ValueError("Please Connect Just One Joystick")
 
-        self._joystick = pygame.joystick.Joystick(0)
-        self._joystick.init()
-
+            self._joystick = pygame.joystick.Joystick(0)
+            self._joystick.init()
+        elif equipment == 3:
+            # remote steering wheel
+            self.client = MQTTClient("xp_listener")
+            self.client.add_subscription("hello_world")
+            
         self._parser = ConfigParser()
         self._parser.read('wheel_config.ini')
         self._steer_idx = int(
@@ -233,6 +205,8 @@ class DualControl(object):
             self._parser.get('G29 Racing Wheel', 'handbrake'))
         
         self.equipment = equipment
+        
+        
 
     def parse_events_bak(self, world, clock):
         for event in pygame.event.get():
@@ -305,6 +279,9 @@ class DualControl(object):
                 self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time())
             elif self.equipment == 2:
                 self._parse_vehicle_wheel()
+            elif self.equipment == 3:
+                self._parse_vehicle_remote_wheel()
+            
             self._control.reverse = self._control.gear < 0
         elif isinstance(self._control, carla.WalkerControl):
             self._parse_walker_keys(pygame.key.get_pressed(), clock.get_time())
@@ -359,6 +336,14 @@ class DualControl(object):
 
         self._control.hand_brake = bool(jsButtons[self._handbrake_idx])
 
+    def _parse_vehicle_remote_wheel(self):
+        # Custom function to map range of inputs [1, -1] to outputs [0, 1] i.e 1 from inputs means nothing is pressed
+        # For the steering, it seems fine as it is
+        self.client.spin()
+        self._control.steer = self.client.real_time_steering
+        self._control.brake = self.client.real_time_braking
+        self._control.throttle = self.client.real_time_throttle
+        
     def _parse_walker_keys(self, keys, milliseconds):
         self._control.speed = 0.0
         if keys[K_DOWN] or keys[K_s]:

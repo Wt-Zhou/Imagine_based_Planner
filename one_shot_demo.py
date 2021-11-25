@@ -27,11 +27,10 @@ imagine_model = Log_Replay_Imagine_Model_New(empty_env)
 load_step = 350000
 imagine_model.load_ego_dynamics(empty_env, load_step)
 
-# for i in range(0, 100):
     
 # 2. Drive, Collect Data
 # 3. Corner Case Data Collection
-hand_control_env = CarEnv_03_HandControl(spawn_env_vehicle = True, handcontrol = True)
+hand_control_env = CarEnv_03_HandControl(spawn_env_vehicle = True, handcontrol = True, equipment = 1) #equipment:1-keyboard, 2-steeringwheel, 3-remote steeringwheel
 imagine_model.collect_corner_data(hand_control_env)
 
 # 4. Imagine and Improve Policy
