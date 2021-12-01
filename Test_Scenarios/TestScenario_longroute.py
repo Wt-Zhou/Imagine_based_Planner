@@ -30,41 +30,39 @@ from agents.navigation.global_route_planner_dao import GlobalRoutePlannerDAO
 from Agent.zzz.dynamic_map import Lanepoint, Lane, Vehicle
 from Agent.zzz.tools import *
 
-global start_point_10
-start_point_10 = Transform()
-start_point_10.location.x = 105
-start_point_10.location.y = -85
-start_point_10.location.z = 1
-start_point_10.rotation.pitch = 0
-start_point_10.rotation.yaw = 90
-start_point_10.rotation.roll = 0
-
-global goal_point_10
-goal_point_10 = Transform()
-goal_point_10.location.x = 105
-goal_point_10.location.y = 0
-goal_point_10.location.z = 1
-goal_point_10.rotation.pitch = 90
-goal_point_10.rotation.yaw = 0 
-goal_point_10.rotation.roll = 0
+global start_point_02
+start_point_02 = Transform()
+start_point_02.location.x = -43
+start_point_02.location.y = 183
+start_point_02.location.z = 1
+start_point_02.rotation.pitch = 0
+start_point_02.rotation.yaw = -220
+start_point_02.rotation.roll = 0
 
 
-class CarEnv_03_LongRoute:
+global goal_point_02
+goal_point_02 = Transform()
+goal_point_02.location.x = -77
+goal_point_02.location.y = 150
+goal_point_02.location.z = 0
+goal_point_02.rotation.pitch = 0
+goal_point_02.rotation.yaw = 0 
+goal_point_02.rotation.roll = 0
 
-    def __init__(self, spawn_env_veh = True):
+class CarEnv_10_Long_Test:
 
-        self.spawn_env_veh = spawn_env_veh
+    def __init__(self):
+        
         # CARLA settings
         self.client = carla.Client("localhost", 2000)
         self.client.set_timeout(10.0)
         self.world = self.client.get_world()
-
-        if self.world.get_map().name != 'Town10HD':
-            self.world = self.client.load_world('Town10HD')
-        self.world.set_weather(carla.WeatherParameters(cloudiness=0, precipitation=10.0, sun_altitude_angle=90.0))
+        if self.world.get_map().name != 'Carla/Maps/Town10':
+            self.world = self.client.load_world('Town10')
+        self.world.set_weather(carla.WeatherParameters(cloudiness=50, precipitation=10.0, sun_altitude_angle=30.0))
         settings = self.world.get_settings()
         settings.no_rendering_mode = False
-        settings.fixed_delta_seconds = 0.2 # Warning: When change simulator, the delta_t in controller should also be change.
+        settings.fixed_delta_seconds = 0.1 # Warning: When change simulator, the delta_t in controller should also be change.
         settings.substepping = True
         settings.max_substep_delta_time = 0.02  # fixed_delta_seconds <= max_substep_delta_time * max_substeps
         settings.max_substeps = 10
@@ -86,27 +84,32 @@ class CarEnv_03_LongRoute:
         self.global_routing()
 
         # RL settingss
-        self.action_space = spaces.Discrete(7) # len(fplist + 1) 0 for brake 
-        self.state_dimension = 10
-        self.low  = np.array([100,  30, -5, -5,-180, 100,  30, -5, -5,-180], dtype=np.float64)
-        self.high = np.array([115,  100, 1, 1,180, 115,  100, 1, 1,180], dtype=np.float64)    
+        self.action_space = spaces.Discrete(8) # len(fplist + 2) 0 for rule, 1 for brake 
+        self.low  = np.array([-70,  160, -5, -1,-70,  160, -5, -1, -70,  160, -5, -1, -70,  160, -5, -1], dtype=np.float64)
+        self.high = np.array([-30,  190, 1, 1,  -30,  190, 1, 1, -30,  190, 1, 1, -30,  190, 1, 1], dtype=np.float64)    
         self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
 
         # Spawn Ego Vehicle
-        global start_point_10
-        self.ego_vehicle_bp = random.choice(self.world.get_blueprint_library().filter('vehicle.mercedes.coupe'))
+        global start_point_02
+        # self.ego_vehicle_bp = random.choice(self.world.get_blueprint_library().filter('vehicle.mercedes-benz.coupe'))
+        self.ego_vehicle_bp = random.choice(self.world.get_blueprint_library().filter('vehicle.lincoln.mkz_2020'))
         if self.ego_vehicle_bp.has_attribute('color'):
-            color = '0,0,0'
+            color = '255,0,0'
             self.ego_vehicle_bp.set_attribute('color', color)
             self.ego_vehicle_bp.set_attribute('role_name', "ego_vehicle")
-        self.ego_vehicle = self.world.spawn_actor(self.ego_vehicle_bp, start_point_10)
-        self.ego_vehicle.set_target_velocity(carla.Vector3D(0,0,0))
-
-        collision_bp = self.world.get_blueprint_library().find('sensor.other.collision')
-        self.ego_collision_sensor = self.world.spawn_actor(collision_bp, Transform(), self.ego_vehicle, carla.AttachmentType.Rigid)
-        self.ego_collision_sensor.listen(lambda event: self.ego_vehicle_collision(event))
-        self.ego_vehicle_collision_sign = False
+        self.ego_collision_bp = self.world.get_blueprint_library().find('sensor.other.collision')
+        self.ego_vehicle = None
         self.stuck_time = 0
+        
+        # self.env_vehicle_bp = random.choice(self.world.get_blueprint_library().filter('vehicle.mercedes-benz.coupe'))
+        self.env_vehicle_bp = random.choice(self.world.get_blueprint_library().filter('vehicle.audi.tt'))
+        if self.env_vehicle_bp.has_attribute('color'):
+            color = '0,0,255'
+            self.env_vehicle_bp.set_attribute('color', color)
+        if self.env_vehicle_bp.has_attribute('driver_id'):
+            driver_id = random.choice(self.env_vehicle_bp.get_attribute('driver_id').recommended_values)
+            self.env_vehicle_bp.set_attribute('driver_id', driver_id)
+            self.env_vehicle_bp.set_attribute('role_name', 'autopilot')
 
         # Control Env Vehicle
         self.has_set = np.zeros(1000000)
@@ -129,19 +132,21 @@ class CarEnv_03_LongRoute:
             tl.set_red_time(5)
 
     def global_routing(self):
-        global goal_point_10
-        global start_point_10
+        global goal_point_02
+        global start_point_02
 
-        start = start_point_10
-        goal = goal_point_10
+        start = start_point_02
+        goal = goal_point_02
         print("Calculating route to x={}, y={}, z={}".format(
                 goal.location.x,
                 goal.location.y,
                 goal.location.z))
         
         dao = GlobalRoutePlannerDAO(self.world.get_map(), 1)
-        grp = GlobalRoutePlanner(dao)
-        grp.setup()
+        # grp = GlobalRoutePlanner(dao) # Carla 0911
+        # grp.setup()
+
+        grp = GlobalRoutePlanner(self.world.get_map(), sampling_resolution=1) # Carla 0913
         current_route = grp.trace_route(carla.Location(start.location.x,
                                                 start.location.y,
                                                 start.location.z),
@@ -152,7 +157,7 @@ class CarEnv_03_LongRoute:
         self.ref_path = Lane()
         for wp in current_route:
             lanepoint = Lanepoint()
-            lanepoint.position.x = wp[0].transform.location.x + 2.0
+            lanepoint.position.x = wp[0].transform.location.x 
             lanepoint.position.y = wp[0].transform.location.y
             self.ref_path.central_path.append(lanepoint)
             t_array.append(lanepoint)
@@ -163,7 +168,7 @@ class CarEnv_03_LongRoute:
         self.ref_path_array = dense_polyline2d(ref_path_ori, 2)
         self.ref_path_tangets = np.zeros(len(self.ref_path_array))
 
-    def ego_vehicle_stuck(self, stay_thres = 5):        
+    def ego_vehicle_stuck(self, stay_thres = 2):        
         ego_vehicle_velocity = math.sqrt(self.ego_vehicle.get_velocity().x ** 2 + self.ego_vehicle.get_velocity().y ** 2 + self.ego_vehicle.get_velocity().z ** 2)
         if ego_vehicle_velocity < 0.1:
             pass
@@ -172,12 +177,11 @@ class CarEnv_03_LongRoute:
 
         if time.time() - self.stuck_time > stay_thres:
             return True
-        return False
-
+        
     def ego_vehicle_pass(self):
-        global goal_point_03
+        global goal_point_02
         ego_location = self.ego_vehicle.get_location()
-        if ego_location.distance(goal_point_03.location) < 10:
+        if ego_location.distance(goal_point_02.location) < 20:
             return True
         else:
             return False
@@ -187,7 +191,7 @@ class CarEnv_03_LongRoute:
 
     def wrap_state(self):
         # state = [0 for i in range((OBSTACLES_CONSIDERED + 1) * 4)]
-        state  = np.array([0,  0, 0, 0,0,0,0, 0, 0, 0], dtype=np.float64)
+        state  = np.array([-41,  180, -0, -0,-15, 190, 0, 0, -15, 190, 0, 0, -15, 190, 0, 0], dtype=np.float64)
 
         ego_vehicle_state = Vehicle()
         ego_vehicle_state.x = self.ego_vehicle.get_location().x
@@ -205,27 +209,25 @@ class CarEnv_03_LongRoute:
         state[1] = ego_vehicle_state.y 
         state[2] = ego_vehicle_state.vx 
         state[3] = ego_vehicle_state.vy 
-        state[4] = ego_vehicle_state.yaw 
 
         # Obs state
         closest_obs = []
-        closest_obs = self.found_closest_obstacles()
+        closest_obs = self.found_closest_obstacles_ramp()
         i = 0
         for obs in closest_obs: 
             if i < OBSTACLES_CONSIDERED:
                 if obs[0] != 0:
-                    state[(i+1)*5+0] = obs[0] #- ego_ffstate.s 
-                    state[(i+1)*5+1] = obs[1] #+ ego_ffstate.d
-                    state[(i+1)*5+2] = obs[2]
-                    state[(i+1)*5+3] = obs[3]
-                    state[(i+1)*5+4] = obs[4]
+                    state[(i+1)*4+0] = obs[0] 
+                    state[(i+1)*4+1] = obs[1] 
+                    state[(i+1)*4+2] = obs[2]
+                    state[(i+1)*4+3] = obs[3]
                 i = i+1
             else:
                 break
         
         return state
 
-    def found_closest_obstacles(self):
+    def found_closest_obstacles_ramp(self):
         obs_tuples = []
         for obs in self.world.get_actors().filter('vehicle*'): 
             # Calculate distance
@@ -235,7 +237,7 @@ class CarEnv_03_LongRoute:
             p4 = math.hypot(p3[0],p3[1])
             
             # Obstacles too far
-            one_obs = (obs.get_location().x, obs.get_location().y, obs.get_velocity().x, obs.get_velocity().y, obs.get_transform().rotation.yaw / 180.0 * math.pi , p4, obs.get_transform().rotation.yaw)
+            one_obs = (obs.get_location().x, obs.get_location().y, obs.get_velocity().x, obs.get_velocity().y, p4, obs.get_transform().rotation.yaw)
             if p4 > 0:
                 obs_tuples.append(one_obs)
         
@@ -245,11 +247,26 @@ class CarEnv_03_LongRoute:
             closest_obs.append(fake_obs)
         
         # Sort by distance
-        sorted_obs = sorted(obs_tuples, key=lambda obs: obs[5])   
+        sorted_obs = sorted(obs_tuples, key=lambda obs: obs[4])   
 
+        put_1st = False
+        put_2nd = False
+        put_3rd = False
         for obs in sorted_obs:
-            closest_obs[0] = obs 
-
+            if obs[0] > -50 and obs[1] < 200 and put_1st == False:
+                closest_obs[0] = obs 
+                put_1st = True
+                continue
+            if obs[0] < -50 and obs[1] < 200 and put_2nd == False:
+                closest_obs[1] = obs
+                put_2nd = True
+                continue
+            if obs[0] < -50 and obs[1] < 200 and put_3rd == False:
+                closest_obs[2] = obs
+                put_3rd = True
+                continue
+            else:
+                continue
         return closest_obs
                                             
     def record_information_txt(self):
@@ -282,25 +299,14 @@ class CarEnv_03_LongRoute:
         self.collision_num = 0
 
     def reset(self):    
+
+        # Env vehicles
+        self.spawn_fixed_veh()
+
         # Ego vehicle
-        if self.ego_vehicle is not None:
-            self.ego_collision_sensor.destroy()
-            self.ego_vehicle.destroy()
-
-        # Control Env Elements
-        if self.spawn_env_veh:
-            self.spawn_fixed_veh()
-
-        global start_point_10
-        self.ego_vehicle = self.world.spawn_actor(self.ego_vehicle_bp, start_point_10)
-        self.ego_vehicle.set_target_velocity(carla.Vector3D(0,0,0))
-
-        collision_bp = self.world.get_blueprint_library().find('sensor.other.collision')
-        self.ego_collision_sensor = self.world.spawn_actor(collision_bp, Transform(), self.ego_vehicle, carla.AttachmentType.Rigid)
-        self.ego_collision_sensor.listen(lambda event: self.ego_vehicle_collision(event))
-        self.ego_vehicle_collision_sign = False
-
+        self.spawn_ego_veh()
         self.world.tick() 
+
 
         # State
         state = self.wrap_state()
@@ -314,7 +320,7 @@ class CarEnv_03_LongRoute:
 
     def step(self, action):
         # Control ego vehicle
-        print("action[0]",action[0])
+        # print("action[0]",action[0])
         throttle = max(0,float(action[0]))  # range [0,1]
         brake = max(0,-float(action[0])) # range [0,1]
         steer = action[1] # range [-1,1]
@@ -325,53 +331,135 @@ class CarEnv_03_LongRoute:
         state = self.wrap_state()
 
         # Step reward
-        ego_vehicle_velocity = math.sqrt(self.ego_vehicle.get_velocity().x ** 2 + self.ego_vehicle.get_velocity().y ** 2 + self.ego_vehicle.get_velocity().z ** 2)
-
-        reward = ego_vehicle_velocity / 15
+        reward = 0
         # If finish
         done = False
         if self.ego_vehicle_collision_sign:
             self.collision_num += + 1
             done = True
+            reward = 0
             print("[CARLA]: Collision!")
         
         if self.ego_vehicle_pass():
             done = True
+            reward = 1
             print("[CARLA]: Successful!")
 
         elif self.ego_vehicle_stuck():
             self.stuck_num += 1
+            reward = -0.0
             done = True
             print("[CARLA]: Stuck!")
-
-
-        actor_list = self.world.get_actors()
-        vehicle_list = actor_list.filter("*vehicle*")
-        for vehicle in vehicle_list:  
-            self.tm.ignore_signs_percentage(vehicle, 100)
-            self.tm.ignore_lights_percentage(vehicle, 100)
-            self.tm.ignore_walkers_percentage(vehicle, 0)
-            self.tm.set_percentage_keep_right_rule(vehicle,100) # it can make the actor go forward, dont know why
-            self.tm.auto_lane_change(vehicle, True)
-            self.tm.distance_to_leading_vehicle(vehicle, 10)
-            self.tm.collision_detection(vehicle, self.ego_vehicle, False)
 
         return state, reward, done, None
 
     def init_case(self):
         self.case_list = []
+        
+        useless_transform = Transform()
+        useless_transform.location.x = -45 
+        useless_transform.location.y = 204
+        useless_transform.location.z = 1
+        useless_transform.rotation.pitch = 0
+        useless_transform.rotation.yaw = 0
+        useless_transform.rotation.roll = 0
+        
+        useless_transform_2 = Transform()
+        useless_transform_2.location.x = -65 
+        useless_transform_2.location.y = 200
+        useless_transform_2.location.z = 1
+        useless_transform_2.rotation.pitch = 0
+        useless_transform_2.rotation.yaw = 0
+        useless_transform_2.rotation.roll = 0
+        
+        # one vehicle behind
+        for i in range(0,10):
+            spawn_vehicles = []
+            transform = Transform()
+            transform.location.x = -45 + i * 5
+            transform.location.y = 193
+            transform.location.z = 1
+            transform.rotation.pitch = 0
+            transform.rotation.yaw = -180
+            transform.rotation.roll = 0
+            spawn_vehicles.append(transform)
+            spawn_vehicles.append(useless_transform)
+            spawn_vehicles.append(useless_transform_2)
+            self.case_list.append(spawn_vehicles)
 
-        # one vehicle from left
-        spawn_vehicles = []
-        transform = Transform()
-        transform.location.x = 105 
-        transform.location.y = -90
-        transform.location.z = 1
-        transform.rotation.pitch = 0
-        transform.rotation.yaw = 90
-        transform.rotation.roll = 0
-        spawn_vehicles.append(transform)
-        self.case_list.append(spawn_vehicles)
+        # one vehicle front
+        for i in range(0,5):
+            spawn_vehicles = []
+            transform = Transform()
+            transform.location.x = -59 + i * 1 
+            transform.location.y = 188
+            transform.location.z = 1
+            transform.rotation.pitch = 0
+            transform.rotation.yaw = -140
+            transform.rotation.roll = 0
+            spawn_vehicles.append(transform)
+            spawn_vehicles.append(useless_transform)
+            spawn_vehicles.append(useless_transform_2)
+            self.case_list.append(spawn_vehicles)
+
+        # two vehicles
+        for i in range(0,10):
+            for j in range(0,10):
+                spawn_vehicles = []
+                transform = Transform()
+                transform.location.x = -45 + i * 5
+                transform.location.y = 193
+                transform.location.z = 1
+                transform.rotation.pitch = 0
+                transform.rotation.yaw = -180
+                transform.rotation.roll = 0
+                spawn_vehicles.append(transform)
+                transform = Transform()
+                transform.location.x = -52 + i * 5
+                transform.location.y = 196
+                transform.location.z = 12
+                transform.rotation.pitch = 0
+                transform.rotation.yaw = -180
+                transform.rotation.roll = 0
+                spawn_vehicles.append(transform)
+                spawn_vehicles.append(useless_transform)
+                spawn_vehicles.append(useless_transform_2)
+                self.case_list.append(spawn_vehicles)
+
+        # 3 vehicles
+        for i in range(0,10):
+            for j in range(0,10):
+                for k in range (0,5):
+                    spawn_vehicles = []
+                    transform = Transform()
+                    transform.location.x = -45 + i * 5
+                    transform.location.y = 193
+                    transform.location.z = 1
+                    transform.rotation.pitch = 0
+                    transform.rotation.yaw = -180
+                    transform.rotation.roll = 0
+                    spawn_vehicles.append(transform)
+                    
+                    transform = Transform()
+                    transform.location.x = -52 + i * 5
+                    transform.location.y = 196
+                    transform.location.z = 1
+                    transform.rotation.pitch = 0
+                    transform.rotation.yaw = -180
+                    transform.rotation.roll = 0
+                    spawn_vehicles.append(transform)
+                    
+                    transform = Transform()
+                    transform.location.x = -59 + i * 1 
+                    transform.location.y = 188
+                    transform.location.z = 1
+                    transform.rotation.pitch = 0
+                    transform.rotation.yaw = -140
+                    transform.rotation.roll = 0
+                    spawn_vehicles.append(transform)
+                    spawn_vehicles.append(useless_transform)
+                    spawn_vehicles.append(useless_transform_2)
+                    self.case_list.append(spawn_vehicles)
 
         print("How many Cases?",len(self.case_list))
 
@@ -385,8 +473,6 @@ class CarEnv_03_LongRoute:
         FutureActor = carla.command.FutureActor
         synchronous_master = True
 
-
-
         for vehicle in vehicle_list:
             if vehicle.attributes['role_name'] != "ego_vehicle" :
                 vehicle.destroy()
@@ -395,19 +481,26 @@ class CarEnv_03_LongRoute:
         print("Case_id",self.case_id)
 
         for transform in self.case_list[self.case_id - 1]:
-            blueprints_ori = self.world.get_blueprint_library().filter('vehicle.*')
-            spawn_points_ori = self.world.get_map().get_spawn_points()
-            blueprint = random.choice(self.world.get_blueprint_library().filter('vehicle.mercedes.coupe'))
-            
-            if blueprint.has_attribute('color'):
-                color = '255,0,0'#random.choice(blueprint.get_attribute('color').recommended_values)
-                # print("DEBUG",blueprint.get_attribute('color').recommended_values)
-                blueprint.set_attribute('color', color)
-                blueprint.set_attribute('color', color)
-            if blueprint.has_attribute('driver_id'):
-                driver_id = random.choice(blueprint.get_attribute('driver_id').recommended_values)
-                blueprint.set_attribute('driver_id', driver_id)
-            blueprint.set_attribute('role_name', 'autopilot')
-            batch.append(SpawnActor(blueprint, transform).then(SetAutopilot(FutureActor, True)))
-            
+            batch.append(SpawnActor(self.env_vehicle_bp, transform).then(SetAutopilot(FutureActor, True)))
+    
         self.client.apply_batch_sync(batch, synchronous_master)
+
+        actor_list = self.world.get_actors()
+        vehicle_list = actor_list.filter("*vehicle*")
+        for vehicle in vehicle_list:  
+            self.tm.ignore_signs_percentage(vehicle, 100)
+            self.tm.ignore_lights_percentage(vehicle, 100)
+            self.tm.ignore_walkers_percentage(vehicle, 0)
+            self.tm.auto_lane_change(vehicle, True)
+            # self.tm.distance_to_leading_vehicle(vehicle, 10)
+
+    def spawn_ego_veh(self):
+        global start_point_02
+        if self.ego_vehicle is not None:
+            self.ego_collision_sensor.destroy()
+            self.ego_vehicle.destroy()
+
+        self.ego_vehicle = self.world.spawn_actor(self.ego_vehicle_bp, start_point_02)
+        self.ego_collision_sensor = self.world.spawn_actor(self.ego_collision_bp, Transform(), self.ego_vehicle, carla.AttachmentType.Rigid)
+        self.ego_collision_sensor.listen(lambda event: self.ego_vehicle_collision(event))
+        self.ego_vehicle_collision_sign = False

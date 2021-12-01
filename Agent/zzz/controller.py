@@ -177,7 +177,6 @@ class PurePuesuitController(object):
         
         k = 1.0 # XXX: np.pi/180*50
         theta = theta * k
-        
         return theta
 
 

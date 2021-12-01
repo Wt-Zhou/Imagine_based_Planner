@@ -85,7 +85,7 @@ class DynamicMap():
 
         self.ego_vehicle.v = math.sqrt(self.ego_vehicle.vx ** 2 + self.ego_vehicle.vy ** 2)
         # The control module used yaw and yawdt
-        self.ego_vehicle.yaw = obs[4] #env.ego_vehicle.get_transform().rotation.yaw / 180.0 * math.pi # Transfer to rad
+        self.ego_vehicle.yaw = env.ego_vehicle.get_transform().rotation.yaw / 180.0 * math.pi # Transfer to rad
         # self.ego_vehicle.yawdt = env.ego_vehicle.get_angular_velocity() 
         
         # Env information from obs

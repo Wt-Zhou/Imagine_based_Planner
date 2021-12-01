@@ -12,8 +12,8 @@ logging.getLogger('tensorflow').disabled = True
 logging.getLogger('gym').disabled = True
 logging.getLogger('pygame').disabled = True
 from Test_Scenarios.TestScenario_handcontrol import CarEnv_03_HandControl
-from Agent.CP_New import CP
-from Agent.CP_New import Log_Replay_Imagine_Model_New
+from Agent.CP_One_shot_demo import CP
+from Agent.CP_One_shot_demo import Log_Replay_Imagine_Model_New
 
 
 # 1. Init Model

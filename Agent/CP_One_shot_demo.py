@@ -657,10 +657,6 @@ class CP(object):
                     imagine_model.current_s = imagine_model.s_0
                     imagine_model.simulation_step = 0
                     
-
-                                
-
-
 class World_Buffer(object):
     """Buffer to store environment transitions."""
     def __init__(self, obs_shape, action_shape, capacity, batch_size, device):

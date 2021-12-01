@@ -61,7 +61,7 @@ class JunctionTrajectoryPlanner(object):
         self.target_speed = TARGET_SPEED
         self.dts = D_T_S
     
-    def clear_buff(self):
+    def clear_buff(self, clean_csp=True):
 
         if self.csp is None:
             return
@@ -71,7 +71,8 @@ class JunctionTrajectoryPlanner(object):
         self.last_trajectory_array_rule = np.c_[0, 0]
         self.last_trajectory_rule = Frenet_path()
         self.reference_path = None
-        self.csp = None
+        if clean_csp:
+            self.csp = None
     
     def set_ROBOT_RADIUS(self, radius, move_gap):
         self.radius = radius
@@ -106,20 +107,20 @@ class JunctionTrajectoryPlanner(object):
                 trajectory_array = trajectory_array_ori#dense_polyline2d(trajectory_array_ori,1)
                 self.last_trajectory_array_rule = trajectory_array
                 self.last_trajectory_rule = generated_trajectory     
-                # print("[UBP]: ----> Werling Successful Planning")
+                print("[UBP]: ----> Werling Successful Planning")
             
             elif len(self.last_trajectory_rule.s_d) > 5 and self.c_speed > 1:
                 generated_trajectory = self.last_trajectory_rule
 
                 trajectory_array = np.c_[generated_trajectory.x, generated_trajectory.y]
                 desired_speed =  [0] * len(generated_trajectory.s_d)
-                # print("[UBP]: ----> Werling Fail to find a solution")
+                print("[UBP]: ----> Werling Fail to find a solution")
 
             else:
                 generated_trajectory =  self.all_trajectory[0][0]
                 trajectory_array = np.c_[generated_trajectory.x, generated_trajectory.y]
                 desired_speed = [0] * len(trajectory_array)
-                # print("[UBP]: ----> Werling Output ref path")
+                print("[UBP]: ----> Werling Output ref path")
 
             # desired spped is calculate from frenet path, but sometimes frenet path is much longger than real path(spline2D), so we need to cut value in frenet according to th length of spline2D
             desired_speed = desired_speed[:len(trajectory_array)]

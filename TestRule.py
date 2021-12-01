@@ -27,8 +27,9 @@ from tqdm import tqdm
 from collections import deque
 from gym import core, error, spaces, utils
 from gym.utils import seeding
-from TestScenario import CarEnv_03_Cut_In, CarEnv_03_Cut_In_old
-from TestScenario_Town02 import CarEnv_02_Intersection_fixed
+from Test_Scenarios.TestScenario import CarEnv_03_Cut_In, CarEnv_03_Cut_In_old
+from Test_Scenarios.TestScenario_Town02 import CarEnv_02_Intersection_fixed
+from Test_Scenarios.TestScenario_0912 import CarEnv_10_Case_01
 from Agent.zzz.JunctionTrajectoryPlanner import JunctionTrajectoryPlanner
 from Agent.zzz.controller import Controller
 from Agent.zzz.dynamic_map import DynamicMap
@@ -40,7 +41,7 @@ if __name__ == '__main__':
 
     # Create environment
     
-    env = CarEnv_03_Cut_In_old()
+    env = CarEnv_02_Intersection_fixed()
 
     # Create Agent
     trajectory_planner = JunctionTrajectoryPlanner()
@@ -61,11 +62,8 @@ if __name__ == '__main__':
         # Reset environment and get initial state
         obs = env.reset()
         episode_reward = 0
-
         done = False
-
         decision_count = 0
-
         
         # Loop over steps
         while True:
@@ -73,11 +71,12 @@ if __name__ == '__main__':
             dynamic_map.update_map_from_obs(obs, env)
             rule_trajectory, action = trajectory_planner.trajectory_update(dynamic_map)
 
-            # action = random.randint(0,6)
+            # # action = random.randint(0,6)
             # print("action",action)
             # rule_trajectory = trajectory_planner.trajectory_update_CP(action, rule_trajectory)
             # Control
-            for i in range(5):
+            
+            for i in range(1):
                 control_action =  controller.get_control(dynamic_map,  rule_trajectory.trajectory, rule_trajectory.desired_speed)
                 action = [control_action.acc, control_action.steering]
                 new_obs, reward, done, _ = env.step(action)   
@@ -86,29 +85,10 @@ if __name__ == '__main__':
                     break
                 # Set current step for next loop iteration
             obs = new_obs
-            episode_reward += reward
-            
-            
-            # Draw Plot
-            # ax.cla() 
-
-            # angle = obs.tolist()[4]/math.pi*180
-            # rect = plt.Rectangle((obs.tolist()[0],-obs.tolist()[1]),2.5,6,angle=-angle+90, facecolor="red")
-            # ax.add_patch(rect)
-
-            # angle2 = obs.tolist()[9]/math.pi*180 
-
-            # # rect = plt.Rectangle((obs.tolist()[5],-obs.tolist()[6]),2,5,angle=obs.tolist()[9]/math.pi*180)
-            # rect = plt.Rectangle((obs.tolist()[5],-obs.tolist()[6]),2.5,6,angle=-angle2+90)
-            # ax.add_patch(rect)
-            # # ax.axis([200, 315,-145,-30])# Town03 highway
-            # ax.axis([-92,-13,-199,-137])# Town03 cut in
-            # ax.legend()
-            # plt.pause(0.001)
-            
+            episode_reward += reward            
 
             if done:
-                trajectory_planner.clear_buff()
+                trajectory_planner.clear_buff(clean_csp=False)
                 task_time += 1
                 if reward > 0:
                     pass_time += 1
